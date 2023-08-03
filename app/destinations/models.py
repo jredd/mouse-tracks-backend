@@ -74,4 +74,3 @@ class Experience(BaseModel):
             raise ValidationError(
                 "The experience must be associated with at least one location or a destination."
             )
-
