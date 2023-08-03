@@ -1,7 +1,5 @@
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
-
 
 from common import BaseModel
 
@@ -12,14 +10,14 @@ class Destination(BaseModel):
 
 class Location(BaseModel):
     class LocationType(models.TextChoices):
-        RESORT = "RE", _("resort")
-        THEME_PARK = "TP", _("theme-park")
-        WATER_PARK = "WP", _("water-park")
-        ENTERTAINMENT_VENUE = "EV", _("entertainment-venue")
+        RESORT = "resort"
+        THEME_PARK = "theme-park"
+        WATER_PARK = "water-park"
+        ENTERTAINMENT_VENUE = "entertainment-venue"
 
     name = models.CharField(max_length=200, blank=False, unique=True)
     location_type = models.CharField(
-        max_length=2,
+        max_length=20,
         choices=LocationType.choices,
         blank=False,
     )
@@ -33,21 +31,30 @@ class Land(BaseModel):
     name = models.CharField(max_length=200, blank=False)
     park = models.ForeignKey(Location, blank=False, on_delete=models.CASCADE)
 
+    def clean(self):
+        super().clean()
+
+        if self.park.location_type not in [Location.LocationType.THEME_PARK, Location.LocationType.WATER_PARK]:
+            raise ValidationError(
+                "A land's park must be a theme park or a water park."
+            )
+
 
 class Experience(BaseModel):
     class ExperienceType(models.TextChoices):
-        ATTRACTION = "A", _("attraction")
-        ENTERTAINMENT = "EN", _("entertainment")
-        EVENT = "EV", _("event")
-        RESTAURANT = "R", _("restaurant")
-        DINING_EVENT = "DE", _("dining-event")
-        DINNER_SHOW = "DS", _("dinner-show")
+        ATTRACTION = "attraction"
+        ENTERTAINMENT = "entertainment"
+        EVENT = "event"
+        RESTAURANT = "restaurant"
+        DINING_EVENT = "dining-event"
+        DINNER_SHOW = "dinner-show"
 
     name = models.CharField(max_length=150, unique=True, blank=False)
     land = models.ForeignKey(Land, blank=True, null=True, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, blank=False, on_delete=models.CASCADE)
+    locations = models.ManyToManyField(Location, blank=True)
+    destination = models.ForeignKey(Destination, blank=True, null=True, on_delete=models.PROTECT)
     experience_type = models.CharField(
-        max_length=2,
+        max_length=20,
         choices=ExperienceType.choices,
         blank=False,
     )
@@ -57,11 +64,14 @@ class Experience(BaseModel):
 
     def clean(self):
         super().clean()
-        # This method is used for object validation
-        # Here we add our custom validation rule
-        if self.land and self.location != self.land.park:
+
+        if self.land and self.land.park not in self.locations.all():
             raise ValidationError(
-                "The land's park must match the experience's location"
+                "The land's park must be in the experience's locations"
             )
 
+        if not self.locations.exists() and not self.destination:
+            raise ValidationError(
+                "The experience must be associated with at least one location or a destination."
+            )
 

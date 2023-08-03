@@ -1,22 +1,33 @@
 from django.db import models
-from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
 from common import BaseModel
 from destinations import models as dest_models
-from config.settings import AUTH_USER_MODEL
+from custom_auth.models import User
+
+
+VALID_CONTENT_TYPES = {'experience', 'break', 'travelevent', 'meal'}
+
 
 class Trip(BaseModel):
     title = models.CharField(max_length=150, blank=False)
-    created_by = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     destination = models.ForeignKey(dest_models.Destination, on_delete=models.CASCADE)
     start_date = models.DateField(blank=False)
     end_date = models.DateField(blank=False)
 
     def __str__(self):
         return f"{self.created_by.first_name}'s:{self.title}"
+
+    def clean(self):
+        super().clean()
+
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError({
+                'end_date': 'End date must be after the start date.',
+            })
 
 
 class Break(BaseModel):
@@ -28,10 +39,10 @@ class Break(BaseModel):
 
 class TravelEvent(BaseModel):
     class EventType(models.TextChoices):
-        CHECK_IN = "CI", _("check-in")
-        CHECK_OUT = "CO", _("check-out")
-        PARK_HOP = "PH", _("park-hop")
-        OTHER_TRAVEL = "OT", _("other-travel")
+        CHECK_IN = "check-in"
+        CHECK_OUT = "check-out"
+        PARK_HOP = "park-hop"
+        OTHER_TRAVEL = "other-travel"
 
     from_location = models.ForeignKey(
         dest_models.Location, related_name='travels_from', blank=True, null=True, on_delete=models.SET_NULL
@@ -42,7 +53,7 @@ class TravelEvent(BaseModel):
     custom_from_location = models.CharField(max_length=200, blank=True, null=True)
     custom_to_location = models.CharField(max_length=200, blank=True, null=True)
     travel_type = models.CharField(
-        max_length=2,
+        max_length=12,
         choices=EventType.choices,
         blank=False,
     )
@@ -56,18 +67,36 @@ class TravelEvent(BaseModel):
 
     def clean(self):
         super().clean()
-        # Make sure that either from_location or custom_from_location is filled
-        if not self.from_location and not self.custom_from_location:
-            raise ValidationError({
-                'from_location': 'Either from_location or custom_from_location must be filled.',
-                'custom_from_location': 'Either from_location or custom_from_location must be filled.',
-            })
-        # Make sure that either to_location or custom_to_location is filled
-        if not self.to_location and not self.custom_to_location:
-            raise ValidationError({
-                'to_location': 'Either to_location or custom_to_location must be filled.',
-                'custom_to_location': 'Either to_location or custom_to_location must be filled.',
-            })
+
+        # Check for from_location fields
+        if bool(self.from_location) == bool(self.custom_from_location):
+            raise ValidationError(
+                'Only one of from_location and custom_from_location should be filled.'
+            )
+
+        # Check for to_location fields
+        if bool(self.to_location) == bool(self.custom_to_location):
+            raise ValidationError(
+                'Only one of to_location and custom_to_location should be filled.'
+            )
+
+
+class Meal(BaseModel):
+    class MealType(models.TextChoices):
+        BREAKFAST = "breakfast"
+        LUNCH = "lunch"
+        DINNER = "dinner"
+        SNACK = "snack"
+
+    meal_experience = models.ForeignKey(dest_models.Experience, on_delete=models.CASCADE)
+    meal_type = models.CharField(
+        max_length=20,
+        choices=MealType.choices,
+        blank=False,
+    )
+
+    def __str__(self):
+        return f"{self.meal_type}: {self.meal_experience.name}"
 
 
 class ItineraryItem(BaseModel):
@@ -88,8 +117,7 @@ class ItineraryItem(BaseModel):
 
     def clean(self):
         super().clean()
-        valid_content_types = ContentType.objects.get_for_models(dest_models.Experience, Break, TravelEvent)
-        if self.content_type not in valid_content_types.values():
+        if self.content_type.model not in VALID_CONTENT_TYPES:
             raise ValidationError(
                 {'content_type': 'Invalid content type.'}
             )

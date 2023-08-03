@@ -1,23 +1,28 @@
-from django.urls import include, path
-from rest_framework_nested import routers
-
+from django.urls import path
 from . import views
 
-router = routers.SimpleRouter()
-router.register(r'trips', views.TripView, basename='trip')
-
-itinerary_router = routers.NestedSimpleRouter(router, r'trips', lookup='trip')
-itinerary_router.register(r'itinerary-items', views.ItineraryItemView, basename='trip-itinerary-items')
-
-break_router = routers.NestedSimpleRouter(itinerary_router, r'itinerary-items', lookup='itinerary_item')
-break_router.register(r'breaks', views.BreakView, basename='itinerary-item-breaks')
-
-travel_event_router = routers.NestedSimpleRouter(itinerary_router, r'itinerary-items', lookup='itinerary_item')
-travel_event_router.register(r'travel-events', views.TravelEventView, basename='itinerary-item-travel-events')
-
 urlpatterns = [
-    path('', include(router.urls)),
-    path('', include(itinerary_router.urls)),
-    path('', include(break_router.urls)),
-    path('', include(travel_event_router.urls)),
+    path('trips/', views.TripView.as_view({'get': 'list', 'post': 'create'}), name='trip-list'),
+    path(
+        'trips/<int:pk>/',
+        views.TripView.as_view(
+            {'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}
+        ),
+        name='trip-detail'
+    ),
+    path(
+        'itinerary-items/',
+        views.ItineraryItemView.as_view({'get': 'list', 'post': 'create'}),
+        name='itinerary-item-list'
+    ),
+    path(
+        'itinerary-items/<int:pk>/',
+        views.ItineraryItemView.as_view(
+            {'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}
+        ),
+        name='itinerary-item-detail'
+    ),
+    path('breaks/<int:pk>/', views.BreakView.as_view(), name='break-detail'),
+    path('travel-events/<int:pk>/', views.TravelEventView.as_view(), name='travel-event-detail'),
+    path('meals/<int:pk>/', views.MealView.as_view(), name='meal-detail'),
 ]

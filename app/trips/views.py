@@ -1,8 +1,9 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, generics, permissions, status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.core.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
+from abc import ABC, abstractmethod
+
 
 from . import models
 from . import serializers
@@ -80,43 +81,56 @@ class ItineraryItemView(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
-class BreakView(viewsets.ModelViewSet):
+class BaseActivityView(generics.UpdateAPIView, generics.DestroyAPIView, ABC):
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_url_kwarg = 'pk'
+
+    @abstractmethod
+    def get_serializer_class(self):
+        pass
+
+    def get_queryset(self):
+        """
+        This view should return a list of all the instances
+        for the currently authenticated user, or for staff/admin.
+        """
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return self.get_serializer_class().Meta.model.objects.all()
+        return self.get_serializer_class().Meta.model.objects.filter(itinerary_item__trip__created_by=user)
+
+    def get_object(self):
+        obj = get_object_or_404(self.get_queryset(), pk=self.kwargs.get('pk'))
+        return obj
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        instance = self.get_object()
+        if instance.itinerary_item.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            self.permission_denied(request)
+
+    def update(self, request, *args, **kwargs):
+        super().update(request, *args, **kwargs)
+        return Response(status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class BreakView(BaseActivityView):
     serializer_class = serializers.BreakSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_class = filters.BreakFilter
 
-    def get_queryset(self):
-        """
-        This view should return a list of all the breaks
-        for the currently authenticated user, or for staff/admin.
-        """
-        user = self.request.user
-        if user.is_staff or user.is_superuser:
-            return models.Break.objects.all()
-        return models.Break.objects.filter(itinerary_item__trip__created_by=user)
 
-    def perform_create(self, serializer):
-        itinerary_item = get_object_or_404(models.ItineraryItem, id=self.kwargs['itinerary_item_pk'])
-        serializer.save(itinerary_item=itinerary_item)
-
-
-class TravelEventView(viewsets.ModelViewSet):
+class TravelEventView(BaseActivityView):
     serializer_class = serializers.TravelEventSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_class = filters.TravelEventFilter
 
-    def get_queryset(self):
-        """
-        This view should return a list of all the travel events
-        for the currently authenticated user, or for staff/admin.
-        """
-        user = self.request.user
-        if user.is_staff or user.is_superuser:
-            return models.TravelEvent.objects.all()
-        return models.TravelEvent.objects.filter(itinerary_item__trip__created_by=user)
 
-    def perform_create(self, serializer):
-        itinerary_item = get_object_or_404(models.ItineraryItem, id=self.kwargs['itinerary_item_pk'])
-        serializer.save(itinerary_item=itinerary_item)
+class MealView(BaseActivityView):
+    serializer_class = serializers.MealSerializer
+    permission_classes = [permissions.IsAuthenticated]
