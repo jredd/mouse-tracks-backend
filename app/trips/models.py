@@ -17,6 +17,7 @@ class Trip(BaseModel):
     destination = models.ForeignKey(dest_models.Destination, on_delete=models.CASCADE)
     start_date = models.DateField(blank=False)
     end_date = models.DateField(blank=False)
+    last_content_update = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.created_by.first_name}'s:{self.title}"

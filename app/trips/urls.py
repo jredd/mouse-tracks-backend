@@ -22,7 +22,8 @@ urlpatterns = [
         ),
         name='itinerary-item-detail'
     ),
-    path('breaks/<int:pk>/', views.BreakView.as_view(), name='break-detail'),
-    path('travel-events/<int:pk>/', views.TravelEventView.as_view(), name='travel-event-detail'),
-    path('meals/<int:pk>/', views.MealView.as_view(), name='meal-detail'),
+    path('itinerary-items/<int:itinerary_item_pk>/breaks/<int:pk>/', views.BreakView.as_view(), name='break-detail'),
+    path('itinerary-items/<int:itinerary_item_pk>/travel-events/<int:pk>/', views.TravelEventView.as_view(),
+         name='travel-event-detail'),
+    path('itinerary-items/<int:itinerary_item_pk>/meals/<int:pk>/', views.MealView.as_view(), name='meal-detail'),
 ]

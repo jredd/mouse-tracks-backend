@@ -10,44 +10,66 @@ class DestinationListView(generics.ListCreateAPIView):
     serializer_class = serializers.DestinationSerializer
     # permission_classes = [permissions.IsAuthenticated]
 
+
 # class DestinationDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):
 class DestinationDetailView(generics.RetrieveUpdateAPIView):
     queryset = models.Destination.objects.all()
     serializer_class = serializers.DestinationSerializer
     # permission_classes = [permissions.IsAuthenticated]
 
+
 # class LocationListView(StaffRequiredMixin, generics.ListCreateAPIView):
 class LocationListView(generics.ListCreateAPIView):
-    queryset = models.Location.objects.all()
     serializer_class = serializers.LocationSerializer
     # permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        dest_id = self.kwargs['dest_id']
+        return models.Location.objects.filter(destination__id=dest_id)
+
 
 # class LocationDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):
 class LocationDetailView(generics.RetrieveUpdateAPIView):
-    queryset = models.Location.objects.all()
     serializer_class = serializers.LocationSerializer
     # permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return models.Location.objects.filter(id=self.kwargs['pk'], destination__id=self.kwargs['dest_id'])
+
+
 # class LandListView(StaffRequiredMixin, generics.ListCreateAPIView):
 class LandListView(generics.ListCreateAPIView):
-    queryset = models.Land.objects.all()
     serializer_class = serializers.LandSerializer
     # permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        loc_id = self.kwargs['loc_id']
+        return models.Land.objects.filter(location__id=loc_id)
+
 
 # class LandDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):
 class LandDetailView(generics.RetrieveUpdateAPIView):
-    queryset = models.Land.objects.all()
     serializer_class = serializers.LandSerializer
     # permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        return models.Land.objects.filter(id=self.kwargs['pk'], location__id=self.kwargs['loc_id'])
+
+
 # class ExperienceListView(StaffRequiredMixin, generics.ListCreateAPIView):
 class ExperienceListView(generics.ListCreateAPIView):
-    queryset = models.Experience.objects.all()
     serializer_class = serializers.ExperienceSerializer
     # permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        loc_id = self.kwargs['loc_id']
+        return models.Experience.objects.filter(location__id=loc_id)
+
+
 # class ExperienceDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):
 class ExperienceDetailView(generics.RetrieveUpdateAPIView):
-    queryset = models.Experience.objects.all()
     serializer_class = serializers.ExperienceSerializer
     # permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return models.Experience.objects.filter(id=self.kwargs['pk'], location__id=self.kwargs['loc_id'])
