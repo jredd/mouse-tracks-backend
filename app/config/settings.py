@@ -6,6 +6,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ENV = os.getenv("ENV")
 if not ENV:
     ENV = 'local'
+print("Starting Env:", ENV)
+
 
 print("base dir:", BASE_DIR)
 
@@ -75,17 +77,27 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-
-
-DATABASES = {
-    "default": {
+DATABASE_ENVS = {
+    "local": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "mousetracks",
         "USER": "mousetracks_app",
         "PASSWORD": "turtlesareawesome",
-        "HOST": "0.0.0.0",
+        "HOST": "localhost",
         "PORT": "5633",
     },
+    "docker_local": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "mousetracks",
+        "USER": "mousetracks_app",
+        "PASSWORD": "turtlesareawesome",
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": "5432",
+    }
+}
+
+DATABASES = {
+    "default": DATABASE_ENVS.get(ENV)
 }
 
 
@@ -129,3 +141,11 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/3.0/howto/static-files/
+STATIC_ROOT = os.path.join(os.path.dirname(BASE_DIR), 'static')
+STATIC_URL = '/static/'
+
+MEDIA_ROOT = os.path.join(os.path.dirname(BASE_DIR), 'media')
+MEDIA_URL = '/media/'

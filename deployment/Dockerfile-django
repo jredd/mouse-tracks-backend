@@ -1,0 +1,10 @@
+FROM python:3.11
+
+RUN mkdir /service
+WORKDIR /service
+
+COPY ../requirements.txt /service/requirements.txt
+
+RUN pip install --no-cache-dir --upgrade -r /service/requirements.txt
+
+COPY ../app /service

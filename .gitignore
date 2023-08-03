@@ -1,6 +1,13 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__
+db.sqlite3
+media
 .idea
 .DS_Store
-.pyc
-*/logs
-pgdata/*
-.env
+static
+.*
+logs
+pgdata
