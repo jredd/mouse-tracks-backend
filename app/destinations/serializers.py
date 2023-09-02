@@ -41,6 +41,9 @@ class LandSerializer(serializers.ModelSerializer):
 
 
 class ExperienceSerializer(serializers.ModelSerializer):
+    land = LandSerializer(read_only=True)  # This will serialize the related Land
+    locations = LocationSerializer(many=True, read_only=True)  # This will serialize all related Locations
+
     class Meta:
         model = models.Experience
         exclude = ['date_created', 'is_deleted', 'date_updated']

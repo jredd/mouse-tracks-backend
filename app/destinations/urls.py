@@ -14,6 +14,7 @@ urlpatterns = [
     path('locations/<uuid:loc_id>/lands/<uuid:land_id>/', views.LandDetailView.as_view(), name='land-detail'),
 
     # For experiences, the URLs are nested under the associated location
+    path('experiences/', views.ExperienceListView.as_view(), name='experience-create'),
     path('locations/<uuid:loc_id>/experiences/', views.ExperienceListView.as_view(), name='experience-list'),
     path('locations/<uuid:loc_id>/experiences/<uuid:exp_id>/', views.ExperienceDetailView.as_view(), name='experience-detail'),
 ]

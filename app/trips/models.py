@@ -109,8 +109,9 @@ class ItineraryItem(BaseModel):
     day = models.DateField(blank=False)
 
     # Fields for generic relation
-    activity_id = models.PositiveIntegerField()
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    activity_id = models.UUIDField(null=True, blank=True)
+    # content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     activity = GenericForeignKey('content_type', 'activity_id')
 
     def __str__(self):

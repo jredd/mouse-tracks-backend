@@ -63,7 +63,7 @@ class ExperienceListView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         loc_id = self.kwargs['loc_id']
-        return models.Experience.objects.filter(location__id=loc_id)
+        return models.Experience.objects.filter(locations__id=loc_id)
 
 
 # class ExperienceDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):
