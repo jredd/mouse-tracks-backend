@@ -6,6 +6,8 @@ from common import BaseModel
 
 class Destination(BaseModel):
     name = models.CharField(max_length=150, unique=True, blank=False)
+    disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
+
 
 
 class Location(BaseModel):
@@ -16,6 +18,7 @@ class Location(BaseModel):
         ENTERTAINMENT_VENUE = "entertainment-venue"
 
     name = models.CharField(max_length=200, blank=False, unique=True)
+    disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
     location_type = models.CharField(
         max_length=20,
         choices=LocationType.choices,
@@ -29,6 +32,7 @@ class Location(BaseModel):
 
 class Land(BaseModel):
     name = models.CharField(max_length=200, blank=False)
+    disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
     park = models.ForeignKey(Location, blank=False, on_delete=models.CASCADE)
 
     def clean(self):
@@ -50,6 +54,13 @@ class Experience(BaseModel):
         DINNER_SHOW = "dinner-show"
 
     name = models.CharField(max_length=150, unique=True, blank=False)
+    short_name = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Shortened name for display purposes, especially on smaller screens.",
+    )
+    disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
     land = models.ForeignKey(Land, blank=True, null=True, on_delete=models.CASCADE)
     locations = models.ManyToManyField(Location, blank=True)
     destination = models.ForeignKey(Destination, blank=True, null=True, on_delete=models.PROTECT)
