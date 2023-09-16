@@ -128,15 +128,12 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
         return representation
 
     def create(self, validated_data):
-
-
         print(f"validated_data: {validated_data}")
         content_type = validated_data.pop('content_type', None)
         activity = validated_data.pop('activity', None)
 
         # If content_type is 'note', handle it differently
         if not content_type:
-            # validated_data['notes'] = validated_data.pop('activity', {}).get('notes')
             notes = validated_data.pop('notes', '')
             print('popped notes:', notes)
             itinerary_item = models.ItineraryItem.objects.create(notes=notes, **validated_data)
@@ -145,8 +142,8 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
 
         # Create the activity based on the content type
         if content_type.model == 'meal':
-            meal_experience_id = activity.get('meal_experience_id')
-            activity['meal_experience_id'] = meal_experience_id
+            # meal_experience_id = activity.get('meal_experience_id')
+            # activity['meal_experience_id'] = meal_experience_id
             activity_obj = models.Meal.objects.create(**activity)
         elif content_type.model == 'break':
             try:
@@ -156,12 +153,11 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Location does not exist.")
         elif content_type.model == 'travelevent':
             try:
-                from_location_instance = dest_models.Location.objects.get(id=activity['from_location_id'])
-                to_location_instance = dest_models.Location.objects.get(id=activity['to_location_id'])
-                activity_obj = models.TravelEvent.objects.create(
-                    from_location=from_location_instance,
-                    to_location=to_location_instance
-                )
+                from_location_instance = dest_models.Location.objects.get(id=activity.pop('from_location_id'))
+                to_location_instance = dest_models.Location.objects.get(id=activity.pop('to_location_id'))
+                activity['from_location'] = from_location_instance
+                activity['to_location'] = to_location_instance
+                activity_obj = models.TravelEvent.objects.create(**activity)
             except ObjectDoesNotExist:
                 raise serializers.ValidationError("Location does not exist.")
             # activity_obj = models.TravelEvent.objects.create(**activity)
