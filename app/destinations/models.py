@@ -6,8 +6,7 @@ from common import BaseModel
 
 class Destination(BaseModel):
     name = models.CharField(max_length=150, unique=True, blank=False)
-    disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
-
+    disney_id = models.CharField(max_length=150, unique=True, blank=False, help_text="Unique identifier from Disney's API")
 
 
 class Location(BaseModel):
@@ -53,7 +52,7 @@ class Experience(BaseModel):
         DINING_EVENT = "dining-event"
         DINNER_SHOW = "dinner-show"
 
-    name = models.CharField(max_length=150, unique=True, blank=False)
+    name = models.CharField(max_length=150, blank=False)
     short_name = models.CharField(
         max_length=50,
         blank=True,

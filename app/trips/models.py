@@ -43,6 +43,7 @@ class TravelEvent(BaseModel):
         CHECK_IN = "check-in"
         CHECK_OUT = "check-out"
         PARK_HOP = "park-hop"
+        FLIGHT = "flight"
         OTHER_TRAVEL = "other-travel"
 
     from_location = models.ForeignKey(

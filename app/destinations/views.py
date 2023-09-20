@@ -44,7 +44,7 @@ class LandListView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         loc_id = self.kwargs['loc_id']
-        return models.Land.objects.filter(location__id=loc_id)
+        return models.Land.objects.filter(park__id=loc_id)
 
 
 # class LandDetailView(StaffRequiredMixin, generics.RetrieveUpdateAPIView):

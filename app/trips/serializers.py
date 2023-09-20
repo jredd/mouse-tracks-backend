@@ -23,7 +23,8 @@ class TripSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         destination_id = validated_data.pop('destination_id')
-        trip = models.Trip.objects.create(destination=destination_id, **validated_data)
+        destination_instance = dest_models.Destination.objects.get(pk=destination_id)
+        trip = models.Trip.objects.create(destination=destination_instance, **validated_data)
         return trip
 
 
@@ -59,9 +60,13 @@ class MealSerializer(serializers.ModelSerializer):
 
 class ContentTypeField(serializers.RelatedField):
     def to_representation(self, value):
+        if value is None:
+            return 'note'
         return value.model
 
     def to_internal_value(self, data):
+        if data == 'note':
+            return None
         return ContentType.objects.get(model=data)
 
 
@@ -85,9 +90,9 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             data['content_type_id'] = content_type.id  # Add content_type_id to validated_data
 
             # Other validations when content_type is not None
-            if content_type.model == 'note':
+            if content_type is None:
                 if 'notes' not in data or not data['notes']:
-                    raise serializers.ValidationError({'notes': 'The notes field is required for content_type "note".'})
+                    raise serializers.ValidationError({'notes': 'The notes field is required when content_type is "note".'})
             elif content_type.model == 'experience':
                 if not data.get('activity_id'):
                     raise serializers.ValidationError({'activity_id': 'This field is required for experiences.'})
@@ -135,15 +140,11 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
         # If content_type is 'note', handle it differently
         if not content_type:
             notes = validated_data.pop('notes', '')
-            print('popped notes:', notes)
             itinerary_item = models.ItineraryItem.objects.create(notes=notes, **validated_data)
             return itinerary_item
 
-
         # Create the activity based on the content type
         if content_type.model == 'meal':
-            # meal_experience_id = activity.get('meal_experience_id')
-            # activity['meal_experience_id'] = meal_experience_id
             activity_obj = models.Meal.objects.create(**activity)
         elif content_type.model == 'break':
             try:
@@ -152,15 +153,33 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             except ObjectDoesNotExist:
                 raise serializers.ValidationError("Location does not exist.")
         elif content_type.model == 'travelevent':
-            try:
-                from_location_instance = dest_models.Location.objects.get(id=activity.pop('from_location_id'))
-                to_location_instance = dest_models.Location.objects.get(id=activity.pop('to_location_id'))
-                activity['from_location'] = from_location_instance
-                activity['to_location'] = to_location_instance
-                activity_obj = models.TravelEvent.objects.create(**activity)
-            except ObjectDoesNotExist:
-                raise serializers.ValidationError("Location does not exist.")
-            # activity_obj = models.TravelEvent.objects.create(**activity)
+            from_location_instance = None
+            to_location_instance = None
+
+            # Check if from_location_id and to_location_id are provided, and if so, fetch them.
+            if activity.get('from_location_id'):
+                try:
+                    from_location_instance = dest_models.Location.objects.get(id=activity.pop('from_location_id'))
+                    activity['from_location'] = from_location_instance
+                except ObjectDoesNotExist:
+                    raise serializers.ValidationError("From location does not exist.")
+
+            if activity.get('to_location_id'):
+                try:
+                    to_location_instance = dest_models.Location.objects.get(id=activity.pop('to_location_id'))
+                    activity['to_location'] = to_location_instance
+                except ObjectDoesNotExist:
+                    raise serializers.ValidationError("To location does not exist.")
+
+            # If neither location ID nor custom location is provided, raise an error.
+            if not from_location_instance and not activity.get('custom_from_location'):
+                raise serializers.ValidationError("Either from_location_id or custom_from_location must be provided.")
+
+            if not to_location_instance and not activity.get('custom_to_location'):
+                raise serializers.ValidationError("Either to_location_id or custom_to_location must be provided.")
+
+            activity_obj = models.TravelEvent.objects.create(**activity)
+
         elif content_type.model == 'experience':
             activity_id = validated_data.get('activity_id')
             if not dest_models.Experience.objects.filter(id=activity_id).exists():
@@ -168,7 +187,7 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             activity_obj = dest_models.Experience.objects.get(id=activity_id)
         else:
             raise serializers.ValidationError('Invalid activity type')
-        # print('turtles', activity_obj)
+
         validated_data['activity_id'] = activity_obj.id
         validated_data['content_type_id'] = content_type.id
 
@@ -185,7 +204,7 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             )
 
         # If instance's content_type is None, handle it as a special case for notes.
-        if instance.content_type is None:
+        if instance.content_type is None or instance.content_type.model == 'note':
             instance.notes = validated_data.get('notes', instance.notes)
             instance.save()
             return instance
