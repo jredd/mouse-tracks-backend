@@ -71,6 +71,8 @@ class ContentTypeField(serializers.RelatedField):
 
 
 class ItineraryItemSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=False, required=False)
+    # id = serializers.UUIDField(read_only=True, required=False)
     activity = serializers.JSONField(required=False)  # Add this line
     content_type_id = serializers.IntegerField(read_only=True)
     activity_id = serializers.UUIDField(required=False, allow_null=True)
@@ -78,7 +80,20 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ItineraryItem
-        exclude = ['date_created', 'is_deleted', 'date_updated']
+        fields = [
+            'id',
+            'trip',
+            'notes',
+            'activity_order',
+            'start_time',
+            'end_time',
+            'day',
+            'activity_id',
+            'content_type',
+            'content_type_id',
+            'activity',
+            'attributes'
+        ]
 
     def validate(self, data):
         # print('in validate')
@@ -96,17 +111,26 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             elif content_type.model == 'experience':
                 if not data.get('activity_id'):
                     raise serializers.ValidationError({'activity_id': 'This field is required for experiences.'})
+
             elif content_type.model not in ['experience', 'note']:
                 if http_method == 'POST':
                     if not data.get('activity'):  # You could add other checks here
                         raise serializers.ValidationError(
                             {
                                 'activity': 'This field is required for all content types except experience when creating.'})
+                    if data.get('id'):
+                        raise serializers.ValidationError(
+                            {
+                                'id': 'This breaks unique constraint on the table.'})
                 elif http_method == 'PUT':
                     if not data.get('activity_id'):  # Here, activity_id is needed
                         raise serializers.ValidationError(
                             {
                                 'activity_id': 'This field is required for all content types except experience when updating.'})
+                    if not data.get('id'):  # Here, id is needed
+                        raise serializers.ValidationError(
+                            {
+                                'id': 'The pk field is required for put actions'})
         else:
             # Handle case where content_type is None (assumed to be notes)
             if 'notes' not in data or not data['notes']:
@@ -200,17 +224,16 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
         trip_id = self.context.get('trip_id')
         if instance.trip.id != trip_id:
             raise serializers.ValidationError(
-                f"Mismatch between trip_id in URL and the ItineraryItem's associated trip."
+                "Mismatch between trip_id in URL and the ItineraryItem's associated trip."
             )
+
+        # We don't want to modify the activity directly
+        activity_data = validated_data.pop('activity', None)
 
         # If instance's content_type is None, handle it as a special case for notes.
         if instance.content_type is None or instance.content_type.model == 'note':
-            instance.notes = validated_data.get('notes', instance.notes)
-            instance.save()
+            instance = super().update(instance, validated_data)
             return instance
-
-        # Otherwise, handle other activity types.
-        activity_data = validated_data.pop('activity', None)
 
         if activity_data:
             # Update the activity model corresponding to the instance's content_type.
@@ -227,9 +250,7 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
                 # If we encounter an unknown content_type.model, raise an error.
                 raise serializers.ValidationError('Unknown activity type encountered during update.')
 
-        # Update the main instance.
         instance = super().update(instance, validated_data)
-        instance.save()
 
         return instance
 
@@ -263,7 +284,7 @@ class ItineraryItemsBulkSerializer(serializers.ListSerializer):
             return items
 
     def update(self, instances, validated_data):
-        print("in update")
+        print("Bulk update method called")
         updated_instances = []
 
         for attrs in validated_data:

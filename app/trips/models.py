@@ -111,9 +111,10 @@ class ItineraryItem(BaseModel):
 
     # Fields for generic relation
     activity_id = models.UUIDField(null=True, blank=True)
-    # content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
     activity = GenericForeignKey('content_type', 'activity_id')
+
+    attributes = models.JSONField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.day}:{self.activity_order}"

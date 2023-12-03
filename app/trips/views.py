@@ -18,7 +18,7 @@ from . import filters as filters
 
 class TripView(viewsets.ModelViewSet):
     serializer_class = serializers.TripSerializer
-    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """
@@ -63,7 +63,7 @@ class TripView(viewsets.ModelViewSet):
 
 class ItineraryItemView(viewsets.ModelViewSet):
     serializer_class = serializers.ItineraryItemSerializer
-    # permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_class = filters.ItineraryItemFilter
 
@@ -152,6 +152,7 @@ class ItineraryItemView(viewsets.ModelViewSet):
 
 
 class ItineraryItemBulkView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def check_items_permissions(self, request, item_ids):
         """
@@ -198,30 +199,65 @@ class ItineraryItemBulkView(APIView):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def put(self, request, trip_id):
-        if not all("id" in item_data for item_data in request.data):
-            raise ValidationError("All items must contain an 'id' for updating.")
-        # self.check_items_permissions(request, item_ids)
+        print("bulk put view")
 
-        with transaction.atomic():
-            updated_items = []
-            for item_data in request.data:
-                item_instance = models.ItineraryItem.objects.get(id=item_data["id"])
-                # serializer = serializers.ItineraryItemSerializer(item_instance, data=item_data, partial=True,
-                #                                                  context={'trip_id': trip_id})
-                serializer = serializers.ItineraryItemSerializer(
-                    item_instance,
-                    data=item_data,
-                    partial=True,
-                    context={'trip_id': trip_id, 'http_method': 'PUT'}
-                )
+        # Initialize the serializer and validate the data
+        serializer = serializers.ItineraryItemsBulkSerializer(
+            data=request.data,
+            context={'trip_id': trip_id, 'http_method': 'PUT'}
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        print('hello:', serializer.validated_data[0])
+        # Fetch all the instances based on the validated data
+        item_ids = [item_data["id"] for item_data in serializer.validated_data]
+        item_instances = models.ItineraryItem.objects.filter(id__in=item_ids)
 
-                if serializer.is_valid(raise_exception=True):
-                    serializer.save()
-                    updated_items.append(serializer.data)
-                else:
-                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if len(item_instances) != len(item_ids):
+            raise ValidationError("Some items do not exist.")
+        print('noooo', request.data)
+        # Reinitialize the serializer, passing the instances to indicate update operation
+        serializer = serializers.ItineraryItemsBulkSerializer(
+            instance=item_instances,  # Pass the instances here!
+            data=request.data,
+            context={'trip_id': trip_id, 'http_method': 'PUT'}
+        )
 
-            return Response(updated_items, status=status.HTTP_200_OK)
+        # Ensure the new serializer instance is also valid before saving
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Save the validated data
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    # def put(self, request, trip_id):
+    #     print("bulk put view")
+    #     if not all("id" in item_data for item_data in request.data):
+    #         raise ValidationError("All items must contain an 'id' for updating.")
+    #     # self.check_items_permissions(request, item_ids)
+    #
+    #     with transaction.atomic():
+    #         updated_items = []
+    #         for item_data in request.data:
+    #             item_instance = models.ItineraryItem.objects.get(id=item_data["id"])
+    #             # serializer = serializers.ItineraryItemSerializer(item_instance, data=item_data, partial=True,
+    #             #                                                  context={'trip_id': trip_id})
+    #             serializer = serializers.ItineraryItemSerializer(
+    #                 item_instance,
+    #                 data=item_data,
+    #                 partial=True,
+    #                 context={'trip_id': trip_id, 'http_method': 'PUT'}
+    #             )
+    #
+    #             if serializer.is_valid(raise_exception=True):
+    #                 serializer.save()
+    #                 updated_items.append(serializer.data)
+    #             else:
+    #                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #
+    #         return Response(updated_items, status=status.HTTP_200_OK)
 
     def delete(self, request, trip_id):
         serializer = serializers.ItineraryItemsBulkDeleteSerializer(data=request.data, context={'trip_id': trip_id})

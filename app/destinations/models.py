@@ -60,7 +60,7 @@ class Experience(BaseModel):
         help_text="Shortened name for display purposes, especially on smaller screens.",
     )
     disney_id = models.CharField(max_length=150, unique=True, help_text="Unique identifier from Disney's API")
-    land = models.ForeignKey(Land, blank=True, null=True, on_delete=models.CASCADE)
+    lands = models.ManyToManyField(Land, blank=True)
     locations = models.ManyToManyField(Location, blank=True)
     destination = models.ForeignKey(Destination, blank=True, null=True, on_delete=models.PROTECT)
     experience_type = models.CharField(
@@ -75,10 +75,11 @@ class Experience(BaseModel):
     def clean(self):
         super().clean()
 
-        if self.land and self.land.park not in self.locations.all():
-            raise ValidationError(
-                "The land's park must be in the experience's locations"
-            )
+        for land in self.lands.all():
+            if land.park not in self.locations.all():
+                raise ValidationError(
+                    "Each land's park must be in the experience's locations"
+                )
 
         if not self.locations.exists() and not self.destination:
             raise ValidationError(
