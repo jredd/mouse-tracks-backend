@@ -44,6 +44,7 @@ class LandSerializer(serializers.ModelSerializer):
 
 
 class ExperienceSerializer(serializers.ModelSerializer):
+    # Be sure to comment this out if you are doing a data dump into the db
     lands = LandSerializer(many=True, read_only=True)  # This will serialize the related Land
     locations = LocationSerializer(many=True, read_only=True)  # This will serialize all related Locations
 

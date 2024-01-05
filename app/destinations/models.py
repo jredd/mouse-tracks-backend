@@ -6,7 +6,12 @@ from common import BaseModel
 
 class Destination(BaseModel):
     name = models.CharField(max_length=150, unique=True, blank=False)
-    disney_id = models.CharField(max_length=150, unique=True, blank=False, help_text="Unique identifier from Disney's API")
+    disney_id = models.CharField(
+        max_length=150,
+        unique=True,
+        blank=False,
+        help_text="Unique identifier from Disney's API"
+    )
 
 
 class Location(BaseModel):
