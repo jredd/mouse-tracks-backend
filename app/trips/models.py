@@ -8,7 +8,7 @@ from destinations import models as dest_models
 from custom_auth.models import User
 
 
-VALID_CONTENT_TYPES = {'experience', 'break', 'travelevent', 'meal'}
+VALID_CONTENT_TYPES = {'experience', 'break', 'travelevent', 'meal', 'note'}
 
 
 class Trip(BaseModel):
@@ -36,6 +36,17 @@ class Break(BaseModel):
 
     def __str__(self):
         return f"Break: {self.location.name}"
+
+
+class Note(BaseModel):
+    location = models.ForeignKey(dest_models.Location, on_delete=models.CASCADE)
+    land = models.ForeignKey(dest_models.Land, blank=True, null=True, on_delete=models.CASCADE)
+    note = models.CharField(max_length=800, blank=True, null=True)
+
+    def __str__(self):
+        if self.land:
+            return f"{self.land.name}: {self.note[:5]}"
+        return f"{self.location.name}: {self.note[:5]}"
 
 
 class TravelEvent(BaseModel):
@@ -103,15 +114,15 @@ class Meal(BaseModel):
 
 class ItineraryItem(BaseModel):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE)
-    notes = models.CharField(max_length=800, blank=True, null=True)
+    note = models.CharField(max_length=800, blank=True, null=True)
     activity_order = models.IntegerField(blank=False)
     start_time = models.TimeField(blank=True, null=True)
     end_time = models.TimeField(blank=True, null=True)
     day = models.DateField(blank=False)
 
     # Fields for generic relation
-    activity_id = models.UUIDField(null=True, blank=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    activity_id = models.UUIDField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     activity = GenericForeignKey('content_type', 'activity_id')
 
     attributes = models.JSONField(blank=True, null=True)

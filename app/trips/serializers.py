@@ -37,6 +37,13 @@ class BreakSerializer(serializers.ModelSerializer):
         exclude = ['date_created', 'is_deleted', 'date_updated']
 
 
+class NoteSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = models.Note
+        exclude = ['date_created', 'is_deleted', 'date_updated']
+
+
 class TravelEventSerializer(serializers.ModelSerializer):
     from_location = dest_serializers.LocationSerializer(read_only=True)
     to_location = dest_serializers.LocationSerializer(read_only=True)
@@ -72,7 +79,6 @@ class ContentTypeField(serializers.RelatedField):
 
 class ItineraryItemSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=False, required=False)
-    # id = serializers.UUIDField(read_only=True, required=False)
     activity = serializers.JSONField(required=False)  # Add this line
     content_type_id = serializers.IntegerField(read_only=True)
     activity_id = serializers.UUIDField(required=False, allow_null=True)
@@ -83,7 +89,7 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'trip',
-            'notes',
+            'note',
             'activity_order',
             'start_time',
             'end_time',
@@ -97,45 +103,16 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         # print('in validate')
-        http_method = self.context.get('http_method')
         content_type = data.get('content_type')
 
         # Validate content_type
-        if content_type:
-            data['content_type_id'] = content_type.id  # Add content_type_id to validated_data
+        data['content_type_id'] = content_type.id  # Add content_type_id to validated_data
 
-            # Other validations when content_type is not None
-            if content_type is None:
-                if 'notes' not in data or not data['notes']:
-                    raise serializers.ValidationError({'notes': 'The notes field is required when content_type is "note".'})
-            elif content_type.model == 'experience':
-                if not data.get('activity_id'):
-                    raise serializers.ValidationError({'activity_id': 'This field is required for experiences.'})
-
-            elif content_type.model not in ['experience', 'note']:
-                if http_method == 'POST':
-                    if not data.get('activity'):  # You could add other checks here
-                        raise serializers.ValidationError(
-                            {
-                                'activity': 'This field is required for all content types except experience when creating.'})
-                    if data.get('id'):
-                        raise serializers.ValidationError(
-                            {
-                                'id': 'This breaks unique constraint on the table.'})
-                elif http_method == 'PUT':
-                    if not data.get('activity_id'):  # Here, activity_id is needed
-                        raise serializers.ValidationError(
-                            {
-                                'activity_id': 'This field is required for all content types except experience when updating.'})
-                    if not data.get('id'):  # Here, id is needed
-                        raise serializers.ValidationError(
-                            {
-                                'id': 'The pk field is required for put actions'})
-        else:
-            # Handle case where content_type is None (assumed to be notes)
-            if 'notes' not in data or not data['notes']:
-                raise serializers.ValidationError(
-                    {'notes': 'The notes field is required when content_type is not provided.'})
+        # Other validations when content_type is not None
+        if content_type == 'note' and 'note' not in data.get('activity', None):
+            raise serializers.ValidationError({'notes': 'The notes field is required when content_type is "note".'})
+        elif content_type.model == 'experience' and not data.get('activity_id'):
+            raise serializers.ValidationError({'activity_id': 'This field is required for experiences.'})
 
         # Validate trip_id
         trip_id = self.context.get('trip_id')
@@ -156,20 +133,43 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
 
         return representation
 
+    def handle_travel_event_create(self, activity):
+        from_location_instance = None
+        to_location_instance = None
+
+        # Check if from_location_id and to_location_id are provided, and if so, fetch them.
+        if activity.get('from_location_id'):
+            try:
+                from_location_instance = dest_models.Location.objects.get(id=activity.pop('from_location_id'))
+                activity['from_location'] = from_location_instance
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError("From location does not exist.")
+
+        if activity.get('to_location_id'):
+            try:
+                to_location_instance = dest_models.Location.objects.get(id=activity.pop('to_location_id'))
+                activity['to_location'] = to_location_instance
+            except ObjectDoesNotExist:
+                raise serializers.ValidationError("To location does not exist.")
+
+        # If neither location ID nor custom location is provided, raise an error.
+        if not from_location_instance and not activity.get('custom_from_location'):
+            raise serializers.ValidationError("Either from_location_id or custom_from_location must be provided.")
+
+        if not to_location_instance and not activity.get('custom_to_location'):
+            raise serializers.ValidationError("Either to_location_id or custom_to_location must be provided.")
+
+        return models.TravelEvent.objects.create(**activity)
+
     def create(self, validated_data):
-        print(f"validated_data: {validated_data}")
         content_type = validated_data.pop('content_type', None)
         activity = validated_data.pop('activity', None)
-
-        # If content_type is 'note', handle it differently
-        if not content_type:
-            notes = validated_data.pop('notes', '')
-            itinerary_item = models.ItineraryItem.objects.create(notes=notes, **validated_data)
-            return itinerary_item
 
         # Create the activity based on the content type
         if content_type.model == 'meal':
             activity_obj = models.Meal.objects.create(**activity)
+        elif content_type.model == 'note':
+            activity_obj = models.Note.objects.create(**activity)
         elif content_type.model == 'break':
             try:
                 location_instance = dest_models.Location.objects.get(id=activity['location'])
@@ -177,32 +177,7 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             except ObjectDoesNotExist:
                 raise serializers.ValidationError("Location does not exist.")
         elif content_type.model == 'travelevent':
-            from_location_instance = None
-            to_location_instance = None
-
-            # Check if from_location_id and to_location_id are provided, and if so, fetch them.
-            if activity.get('from_location_id'):
-                try:
-                    from_location_instance = dest_models.Location.objects.get(id=activity.pop('from_location_id'))
-                    activity['from_location'] = from_location_instance
-                except ObjectDoesNotExist:
-                    raise serializers.ValidationError("From location does not exist.")
-
-            if activity.get('to_location_id'):
-                try:
-                    to_location_instance = dest_models.Location.objects.get(id=activity.pop('to_location_id'))
-                    activity['to_location'] = to_location_instance
-                except ObjectDoesNotExist:
-                    raise serializers.ValidationError("To location does not exist.")
-
-            # If neither location ID nor custom location is provided, raise an error.
-            if not from_location_instance and not activity.get('custom_from_location'):
-                raise serializers.ValidationError("Either from_location_id or custom_from_location must be provided.")
-
-            if not to_location_instance and not activity.get('custom_to_location'):
-                raise serializers.ValidationError("Either to_location_id or custom_to_location must be provided.")
-
-            activity_obj = models.TravelEvent.objects.create(**activity)
+            activity_obj = self.handle_travel_event_create(activity)
 
         elif content_type.model == 'experience':
             activity_id = validated_data.get('activity_id')
@@ -230,34 +205,27 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
         # We don't want to modify the activity directly
         activity_data = validated_data.pop('activity', None)
 
-        # If instance's content_type is None, handle it as a special case for notes.
-        if instance.content_type is None or instance.content_type.model == 'note':
-            instance = super().update(instance, validated_data)
-            return instance
-
-        if activity_data:
-            # Update the activity model corresponding to the instance's content_type.
-            if instance.content_type.model == 'meal':
-                models.Meal.objects.filter(id=instance.activity_id).update(**activity_data)
-            elif instance.content_type.model == 'break':
-                models.Break.objects.filter(id=instance.activity_id).update(**activity_data)
-            elif instance.content_type.model == 'travelevent':
-                models.TravelEvent.objects.filter(id=instance.activity_id).update(**activity_data)
-            elif instance.content_type.model == 'experience':
-                # No updates for Experience as they are immutable.
-                pass
-            else:
-                # If we encounter an unknown content_type.model, raise an error.
-                raise serializers.ValidationError('Unknown activity type encountered during update.')
+        # Update the activity model corresponding to the instance's content_type.
+        if instance.content_type.model == 'meal':
+            models.Meal.objects.filter(id=instance.activity_id).update(**activity_data)
+        elif instance.content_type.model == 'note':
+            models.Note.objects.filter(id=instance.activity_id).update(**activity_data)
+        elif instance.content_type.model == 'break':
+            models.Break.objects.filter(id=instance.activity_id).update(**activity_data)
+        elif instance.content_type.model == 'travelevent':
+            models.TravelEvent.objects.filter(id=instance.activity_id).update(**activity_data)
+        elif instance.content_type.model == 'experience':
+            # No updates for Experience as they are immutable.
+            pass
+        else:
+            # If we encounter an unknown content_type.model, raise an error.
+            raise serializers.ValidationError('Unknown activity type encountered during update.')
 
         instance = super().update(instance, validated_data)
 
         return instance
 
     def get_activity(self, obj):
-        if obj.activity is None or obj.content_type is None:
-            return None
-
         if isinstance(obj.activity, dest_models.Experience):
             return dest_serializers.ExperienceSerializer(obj.activity).data
         elif isinstance(obj.activity, models.Break):
@@ -266,6 +234,8 @@ class ItineraryItemSerializer(serializers.ModelSerializer):
             return TravelEventSerializer(obj.activity).data
         elif isinstance(obj.activity, models.Meal):
             return MealSerializer(obj.activity).data
+        elif isinstance(obj.activity, models.Note):
+            return NoteSerializer(obj.activity).data
         return None
 
 
@@ -274,7 +244,6 @@ class ItineraryItemsBulkSerializer(serializers.ListSerializer):
 
     def create(self, validated_data):
         print("Bulk create method called")
-        # print(f"bulk validated_data: {validated_data}")
         # Using Django's transaction.atomic to ensure atomic transactions
         with transaction.atomic():
             items = []
@@ -286,7 +255,7 @@ class ItineraryItemsBulkSerializer(serializers.ListSerializer):
     def update(self, instances, validated_data):
         print("Bulk update method called")
         updated_instances = []
-
+        # TODO: Make sure this is an atomic transaction
         for attrs in validated_data:
             instance = next(i for i in instances if i.id == attrs['id'])
 

@@ -3,17 +3,13 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
-from rest_framework.decorators import action
 from rest_framework.views import APIView
 from django.db import transaction
 from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError
 
-from . import models
-from . import serializers
-from . import filters as filters
+from . import models, serializers, filters
 
 
 class TripView(viewsets.ModelViewSet):
@@ -25,33 +21,25 @@ class TripView(viewsets.ModelViewSet):
         This view should return a list of all the trips
         for the currently authenticated user, or for staff/admin.
         """
-        # user = self.request.user
-        # if user.is_staff or user.is_superuser:
-        #     return models.Trip.objects.all()
-        # return models.Trip.objects.filter(created_by=user)
-        user_uuid = "928a9da6-fd89-4b1b-9f78-4d6fcfee3038"
-        User = get_user_model()
-        user = User.objects.get(id=user_uuid)
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return models.Trip.objects.all()
+
         return models.Trip.objects.filter(created_by=user)
 
-
     def perform_create(self, serializer):
-        user_uuid = "928a9da6-fd89-4b1b-9f78-4d6fcfee3038"
-        User = get_user_model()
-        user = User.objects.get(id=user_uuid)
-        serializer.save(created_by=user)
-        # serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # if instance.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
+        if instance.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # if instance.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
+        if instance.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            return Response(status=status.HTTP_403_FORBIDDEN)
         return super().partial_update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
@@ -81,14 +69,10 @@ class ItineraryItemView(viewsets.ModelViewSet):
             raise ValueError(f"Invalid activity_content_type: {activity_content_type}")
 
     def get_queryset(self):
-        # user = self.request.user
-        user_uuid = "928a9da6-fd89-4b1b-9f78-4d6fcfee3038"
-        User = get_user_model()
-        user = User.objects.get(id=user_uuid)
         trip_id = self.kwargs.get('trip_id')
         if trip_id is not None:
-            return models.ItineraryItem.objects.filter(trip__id=trip_id, trip__created_by=user)
-        return models.ItineraryItem.objects.filter(trip__created_by=user)
+            return models.ItineraryItem.objects.filter(trip__id=trip_id, trip__created_by=self.request.user)
+        return models.ItineraryItem.objects.filter(trip__created_by=self.request.user)
 
     def create(self, request, *args, **kwargs):
         serializer_data = request.data.copy()
@@ -115,8 +99,8 @@ class ItineraryItemView(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
+        if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         response = super().update(request, *args, **kwargs)
 
@@ -127,8 +111,8 @@ class ItineraryItemView(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
-        # if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
+        if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         response = super().partial_update(request, *args, **kwargs)
 
@@ -139,16 +123,14 @@ class ItineraryItemView(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        # if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
-        #     return Response(status=status.HTTP_403_FORBIDDEN)
+        if instance.trip.created_by != request.user and not request.user.is_staff and not request.user.is_superuser:
+            return Response(status=status.HTTP_403_FORBIDDEN)
 
         trip = instance.trip
         response = super().destroy(request, *args, **kwargs)
 
         if response.status_code == status.HTTP_204_NO_CONTENT:
             self.update_itinerary_item(trip)
-
-#         return response
 
 
 class ItineraryItemBulkView(APIView):
