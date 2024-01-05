@@ -29,3 +29,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Add extra responses here
         data['user_id'] = str(self.user.id)  # self.user is available after calling super().validate(attrs)
         return data
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'first_name', 'last_name', 'email']
